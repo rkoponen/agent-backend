@@ -131,7 +131,7 @@ router.post("/chat/stream", async (context) => {
           start(controller) {
             const encoder = new TextEncoder();
             const unlockMessage =
-              "🔓 Access granted! Welcome! How can I help you today?";
+              "🔓 Access granted! Welcome!";
 
             // Stream the unlock message character by character
             for (const char of unlockMessage) {
