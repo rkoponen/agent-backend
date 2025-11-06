@@ -42,16 +42,39 @@ export const agents = {
   pizzaAgent: pizzaAgent,
 };
 
-export let currentAgent = orchestratorAgent;
+// Session-based agent management - each session has its own agent
+const sessionAgents = new Map<string, keyof typeof agents>();
+
+// Track current session for tool calls
+let currentSessionId: string | null = null;
+
+export const setCurrentSession = (sessionId: string) => {
+  currentSessionId = sessionId;
+};
 
 export const changeAgent = (agentName: keyof typeof agents) => {
+  if (!currentSessionId) {
+    console.error("No active session for agent change");
+    return;
+  }
   if (agents[agentName]) {
-    console.log(`Switching to agent: ${agentName}`);
-    currentAgent = agents[agentName];
+    console.log(
+      `Session ${currentSessionId}: Switching to agent: ${agentName}`
+    );
+    sessionAgents.set(currentSessionId, agentName);
   } else {
     console.error(`Agent not found: ${agentName}`);
   }
 };
+
+export const getCurrentAgent = (sessionId: string) => {
+  const agentName = sessionAgents.get(sessionId) || "orchestratorAgent";
+  return agents[agentName];
+};
+
+// Password and session management
+const PASSWORD = "5080";
+const unlockedSessions = new Set<string>();
 
 const router = new Router();
 
@@ -92,6 +115,66 @@ router.post("/chat/stream", async (context) => {
       return;
     }
 
+    // Check if session is unlocked
+    if (!unlockedSessions.has(sessionId)) {
+      // First message - check if it's the password
+      if (message.trim() === PASSWORD) {
+        // Unlock the session
+        unlockedSessions.add(sessionId);
+
+        // Return unlock success message
+        context.response.headers.set("Content-Type", "text/event-stream");
+        context.response.headers.set("Cache-Control", "no-cache");
+        context.response.headers.set("Connection", "keep-alive");
+
+        const stream = new ReadableStream({
+          start(controller) {
+            const encoder = new TextEncoder();
+            const unlockMessage =
+              "🔓 Access granted! Welcome! How can I help you today?";
+
+            // Stream the unlock message character by character
+            for (const char of unlockMessage) {
+              const data = `data: ${JSON.stringify({ content: char })}\n\n`;
+              controller.enqueue(encoder.encode(data));
+            }
+
+            const doneMessage = `data: ${JSON.stringify({ done: true })}\n\n`;
+            controller.enqueue(encoder.encode(doneMessage));
+            controller.close();
+          },
+        });
+
+        context.response.body = stream;
+        return;
+      } else {
+        // Wrong password
+        context.response.headers.set("Content-Type", "text/event-stream");
+        context.response.headers.set("Cache-Control", "no-cache");
+        context.response.headers.set("Connection", "keep-alive");
+
+        const stream = new ReadableStream({
+          start(controller) {
+            const encoder = new TextEncoder();
+            const errorMessage =
+              "🔒 Access denied. Please enter the correct password to unlock.";
+
+            for (const char of errorMessage) {
+              const data = `data: ${JSON.stringify({ content: char })}\n\n`;
+              controller.enqueue(encoder.encode(data));
+            }
+
+            const doneMessage = `data: ${JSON.stringify({ done: true })}\n\n`;
+            controller.enqueue(encoder.encode(doneMessage));
+            controller.close();
+          },
+        });
+
+        context.response.body = stream;
+        return;
+      }
+    }
+
     // Configure the agent with the session ID for token-level streaming
     const config = {
       configurable: { thread_id: sessionId },
@@ -109,6 +192,12 @@ router.post("/chat/stream", async (context) => {
         const encoder = new TextEncoder();
 
         try {
+          // Set the current session for tool calls
+          setCurrentSession(sessionId);
+
+          // Get the current agent for this session
+          const currentAgent = getCurrentAgent(sessionId);
+
           // Track the agent before streaming starts
           const agentBeforeStream = currentAgent;
           let agentSwitched = false;
@@ -137,31 +226,27 @@ router.post("/chat/stream", async (context) => {
             }
 
             // Check if agent switched during the stream (either to a specialist or back to orchestrator)
-            if (currentAgent !== agentBeforeStream) {
+            const newCurrentAgent = getCurrentAgent(sessionId);
+            if (newCurrentAgent !== agentBeforeStream) {
               agentSwitched = true;
             }
           }
 
           // If agent was switched, activate the new agent with a greeting
-          if (agentSwitched && currentAgent != orchestratorAgent) {
+          const finalAgent = getCurrentAgent(sessionId);
+          if (agentSwitched && finalAgent !== orchestratorAgent) {
             console.log(
-              `Agent switched from ${
+              `Session ${sessionId}: Agent switched from ${
                 agentBeforeStream === orchestratorAgent
                   ? "orchestrator"
                   : "specialist"
               } to ${
-                currentAgent === orchestratorAgent
-                  ? "orchestrator"
-                  : "specialist"
+                finalAgent === orchestratorAgent ? "orchestrator" : "specialist"
               }`
             );
 
-            // Determine the greeting based on which agent we switched to
-            let greeting = "Hello";
-
-            // If returning to orchestrator, ask if they need anything else
             // Send greeting to the new agent to trigger its response
-            const welcomeStream = await currentAgent.stream(
+            const welcomeStream = await finalAgent.stream(
               { messages: [{ role: "user", content: "Hello" }] },
               config
             );
