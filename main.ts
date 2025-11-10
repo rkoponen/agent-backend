@@ -72,10 +72,6 @@ export const getCurrentAgent = (sessionId: string) => {
   return agents[agentName];
 };
 
-// Password and session management
-const PASSWORD = "5080";
-const unlockedSessions = new Set<string>();
-
 const router = new Router();
 
 router.get("/", async (context) => {
@@ -113,66 +109,6 @@ router.post("/chat/stream", async (context) => {
         error: "Field 'sessionId' is required and must be a string",
       };
       return;
-    }
-
-    // Check if session is unlocked
-    if (!unlockedSessions.has(sessionId)) {
-      // First message - check if it's the password
-      if (message.trim() === PASSWORD) {
-        // Unlock the session
-        unlockedSessions.add(sessionId);
-
-        // Return unlock success message
-        context.response.headers.set("Content-Type", "text/event-stream");
-        context.response.headers.set("Cache-Control", "no-cache");
-        context.response.headers.set("Connection", "keep-alive");
-
-        const stream = new ReadableStream({
-          start(controller) {
-            const encoder = new TextEncoder();
-            const unlockMessage =
-              "🔓 Access granted! Welcome!";
-
-            // Stream the unlock message character by character
-            for (const char of unlockMessage) {
-              const data = `data: ${JSON.stringify({ content: char })}\n\n`;
-              controller.enqueue(encoder.encode(data));
-            }
-
-            const doneMessage = `data: ${JSON.stringify({ done: true })}\n\n`;
-            controller.enqueue(encoder.encode(doneMessage));
-            controller.close();
-          },
-        });
-
-        context.response.body = stream;
-        return;
-      } else {
-        // Wrong password
-        context.response.headers.set("Content-Type", "text/event-stream");
-        context.response.headers.set("Cache-Control", "no-cache");
-        context.response.headers.set("Connection", "keep-alive");
-
-        const stream = new ReadableStream({
-          start(controller) {
-            const encoder = new TextEncoder();
-            const errorMessage =
-              "🔒 Access denied. Please enter the correct password to unlock.";
-
-            for (const char of errorMessage) {
-              const data = `data: ${JSON.stringify({ content: char })}\n\n`;
-              controller.enqueue(encoder.encode(data));
-            }
-
-            const doneMessage = `data: ${JSON.stringify({ done: true })}\n\n`;
-            controller.enqueue(encoder.encode(doneMessage));
-            controller.close();
-          },
-        });
-
-        context.response.body = stream;
-        return;
-      }
     }
 
     // Configure the agent with the session ID for token-level streaming
