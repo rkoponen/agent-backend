@@ -1,7 +1,7 @@
 import { createAgent } from "npm:langchain";
 import { model } from "../model.ts";
 import { MemorySaver } from "npm:@langchain/langgraph";
-import { getMenu, order, completeOrder } from "../tools.ts";
+import { getMenu, order} from "../tools.ts";
 
 const checkpointer = new MemorySaver();
 
@@ -43,5 +43,5 @@ EXAMPLES:
 - "Wonderful! That's going to be so satisfying and wholesome. Anything else to complete your meal?"
 `,
   checkpointer: checkpointer,
-  tools: [getMenu, order, completeOrder],
+  tools: [getMenu, order],
 });

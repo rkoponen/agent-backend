@@ -1,7 +1,7 @@
 import { createAgent } from "npm:langchain";
 import { model } from "../model.ts";
 import { MemorySaver } from "npm:@langchain/langgraph";
-import { getMenu, order, completeOrder } from "../tools.ts";
+import { getMenu, order } from "../tools.ts";
 
 const checkpointer = new MemorySaver();
 
@@ -40,5 +40,5 @@ EXAMPLES:
 - "Perfect! One Margherita pizza. Total: $12.99. Thanks!"
 `,
   checkpointer,
-  tools: [order, getMenu, completeOrder],
+  tools: [order, getMenu],
 });
