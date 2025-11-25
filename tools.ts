@@ -139,58 +139,136 @@ export const getParkingOptions = tool(
   }
 );
 
-// Static hotel data for trip planning
-const hotels = [
+// Tyre change garages
+const tyreGarages = [
   {
     id: 1,
-    name: "Helsinki Grand Hotel",
-    location: "City Center, Helsinki",
-    pricePerNight: "€180",
-    rating: 4.5,
-    amenities: ["Free WiFi", "Breakfast included", "Spa", "Parking"],
-    availability: "Available",
+    name: "Vianor Helsinki Keskusta",
+    location: "Mannerheimintie 105, Helsinki",
+    distance: "2.3 km",
+    duration: "8 min",
+    services: ["Tyre change", "Wheel alignment", "Tyre storage"],
+    priceRange: "€40-80",
+    rating: 4.6,
+    availability: "Available today",
+    nextSlots: ["14:00", "16:30", "18:00"],
   },
   {
     id: 2,
-    name: "Seaside Boutique Hotel",
-    location: "Waterfront, Helsinki",
-    pricePerNight: "€150",
-    rating: 4.3,
-    amenities: ["Sea view", "Restaurant", "Free WiFi", "Gym"],
-    availability: "Available",
+    name: "Rengasmaailma Kamppi",
+    location: "Runeberginkatu 5, Helsinki",
+    distance: "1.1 km",
+    duration: "5 min",
+    services: ["Tyre change", "Puncture repair", "New tyres"],
+    priceRange: "€35-70",
+    rating: 4.4,
+    availability: "Available tomorrow",
+    nextSlots: ["09:00", "11:00", "15:00"],
   },
   {
     id: 3,
-    name: "Nordic Business Inn",
-    location: "Business District, Helsinki",
-    pricePerNight: "€120",
-    rating: 4.0,
-    amenities: ["Free WiFi", "Meeting rooms", "Airport shuttle"],
-    availability: "Limited - 2 rooms left",
+    name: "Euromaster Helsinki",
+    location: "Hämeentie 153, Helsinki",
+    distance: "3.5 km",
+    duration: "12 min",
+    services: ["Tyre change", "Brake service", "Wheel balancing"],
+    priceRange: "€45-85",
+    rating: 4.7,
+    availability: "Available today",
+    nextSlots: ["13:00", "15:30", "17:00"],
   },
 ];
 
-export const getHotels = tool(
-  ({ destination, preference }) => {
-    // Select hotel based on preference
-    let selectedHotel;
-    if (preference === "luxury" || preference === "nice") {
-      selectedHotel = hotels[0]; // Helsinki Grand Hotel
-    } else if (preference === "budget") {
-      selectedHotel = hotels[2]; // Nordic Business Inn
-    } else {
-      selectedHotel = hotels[1]; // Seaside Boutique Hotel (default)
-    }
+export const getTyreChangeGarages = tool(
+  () => {
+    // Return the closest garage
+    const garage = tyreGarages[0]; // Vianor Helsinki Keskusta - closest at 2.3km
 
     return JSON.stringify({
-      hotel: selectedHotel,
-      allHotels: hotels.map((h, i) => ({ ...h, number: i + 1 })),
+      name: garage.name,
+      location: garage.location,
+      distance: garage.distance,
+      duration: garage.duration,
+      services: garage.services,
+      priceRange: garage.priceRange,
+      rating: garage.rating,
+      availability: garage.availability,
+      nextSlots: garage.nextSlots,
     });
+  },
+  {
+    name: "get_tyre_change_garages",
+    description:
+      "Find a nearby garage that offers tyre change services. Returns the closest option with availability, pricing, and time slots.",
+  }
+);
+
+export const bookTyreChange = tool(
+  ({ garageName, timeSlot, serviceType }) => {
+    // Find the garage
+    const garage = tyreGarages.find(g => 
+      g.name.toLowerCase().includes(garageName.toLowerCase())
+    ) || tyreGarages[0];
+
+    // Generate booking confirmation
+    const bookingId = `TYRE-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    
+    // Parse date from timeSlot (format: "2025-11-26T14:00:00")
+    const bookingDate = new Date(timeSlot);
+    const dateStr = bookingDate.toLocaleDateString('fi-FI', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    const timeStr = bookingDate.toLocaleTimeString('fi-FI', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    });
+
+    return JSON.stringify({
+      bookingId,
+      garage: garage.name,
+      location: garage.location,
+      service: serviceType,
+      dateTime: timeSlot,
+      dateFormatted: dateStr,
+      timeFormatted: timeStr,
+      estimatedDuration: "30-45 minutes",
+      priceEstimate: garage.priceRange,
+      message: `Tyre change booked at ${garage.name} for ${dateStr} at ${timeStr}. Booking ID: ${bookingId}`,
+    });
+  },
+  {
+    name: "book_tyre_change",
+    description:
+      "Book a tyre change appointment at a garage. Returns booking confirmation with details.",
+    schema: z.object({
+      garageName: z
+        .string()
+        .describe("The name of the garage to book with"),
+      timeSlot: z
+        .string()
+        .describe("The appointment time in ISO 8601 format (e.g., '2025-11-26T14:00:00')"),
+      serviceType: z
+        .string()
+        .default("Tyre change")
+        .describe("Type of service (e.g., 'Tyre change', 'Seasonal tyre change')"),
+    }),
+  }
+);
+
+export const getHotels = tool(
+  ({ destination, preference }) => {
+    // This tool indicates that the agent should generate hotel recommendations
+    // The agent will use its knowledge to suggest appropriate hotels based on the destination and preference
+    return `AGENT_GENERATE_HOTELS: Search for hotels in ${destination} with ${preference} preference. Generate 2-3 realistic hotel recommendations with details like name, location, price per night in euros, rating, amenities, and availability.`;
   },
   {
     name: "get_hotels",
     description:
-      "Search for hotels in a destination and get a curated recommendation. Use preference 'luxury'/'nice' for upscale hotels, 'budget' for economical, or 'moderate' for balanced options.",
+      "Use this tool to indicate you need to generate hotel recommendations for the destination. After calling this tool, you should generate 2-3 realistic hotel options based on your knowledge of hotels in that destination. Include details: name, location, price per night (€), rating, key amenities. Match the preference: 'luxury'/'nice' for upscale hotels (€150-250+/night), 'budget' for economical (€60-100/night), or 'moderate' for balanced options (€100-150/night).",
     schema: z.object({
       destination: z
         .string()
@@ -204,64 +282,48 @@ export const getHotels = tool(
 );
 
 export const bookHotel = tool(
-  ({ hotelIdentifier }) => {
-    let hotel;
-    
-    // Try to parse as number first
-    const hotelNum = parseInt(hotelIdentifier);
-    if (!isNaN(hotelNum) && hotelNum >= 1 && hotelNum <= hotels.length) {
-      hotel = hotels[hotelNum - 1];
-    } else {
-      // Try to find by name
-      hotel = hotels.find(h => 
-        h.name.toLowerCase().includes(hotelIdentifier.toLowerCase())
-      ) || hotels[0]; // Default to first hotel if not found
-    }
-
+  ({ hotelName, pricePerNight }) => {
     // Generate a mock booking confirmation
     const confirmationId = `HTL-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-    return `Your hotel is booked! Reservation ID: ${confirmationId}\n\n` +
-           `${hotel.name}\n` +
-           `${hotel.location}\n` +
-           `${hotel.pricePerNight}/night\n` +
-           `Amenities: ${hotel.amenities.join(", ")}`;
+    return `Hotel booked! Reservation ID: ${confirmationId}\n\n` +
+           `${hotelName}\n` +
+           `${pricePerNight}/night`;
   },
   {
     name: "book_hotel",
     description:
-      "Book a hotel by number (1, 2, 3) or by name. Returns booking confirmation with reservation ID.",
+      "Book a hotel that you previously recommended. Provide the hotel name and price.",
     schema: z.object({
-      hotelIdentifier: z
+      hotelName: z
         .string()
-        .describe("The hotel number (1, 2, 3) or hotel name to book"),
+        .describe("The name of the hotel to book"),
+      pricePerNight: z
+        .string()
+        .describe("The price per night (e.g., '€150')"),
     }),
   }
 );
 
 export const bookRestaurant = tool(
-  ({ restaurantIdentifier, time, partySize }) => {
+  ({ restaurantName, time, partySize }) => {
     let restaurant;
     
     // Try to find by name
-    restaurant = restaurantRecommendations.find(r => 
-      r.name.toLowerCase().includes(restaurantIdentifier.toLowerCase())
-    ) || restaurantRecommendations[0]; // Default to first restaurant if not found
 
     // Generate a mock booking confirmation
     const confirmationId = `RST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
     return `Your restaurant reservation is confirmed! Reservation ID: ${confirmationId}\n\n` +
-           `${restaurant.name}\n` +
-           `${time} for ${partySize} ${partySize === 1 ? 'person' : 'people'}\n` +
-           `${restaurant.cuisine} cuisine, ${restaurant.priceRange}`;
+           `${restaurantName}\n` +
+           `${time} for ${partySize} ${partySize === 1 ? 'person' : 'people'}\n`;
   },
   {
     name: "book_restaurant",
     description:
       "Book a restaurant reservation by name or from the itinerary. Returns booking confirmation with reservation ID.",
     schema: z.object({
-      restaurantIdentifier: z
+      restaurantName: z
         .string()
         .describe("The restaurant name to book"),
       time: z
@@ -298,39 +360,6 @@ const restaurantRecommendations = [
     rating: 4.7,
   },
 ];
-
-export const getRestaurantRecommendations = tool(
-  ({ destination, preference }) => {
-    // Select restaurant based on preference
-    let selectedRestaurant;
-    if (preference === "fine_dining" || preference === "luxury") {
-      selectedRestaurant = restaurantRecommendations[2]; // Olo Ravintola (Michelin)
-    } else if (preference === "traditional" || preference === "local") {
-      selectedRestaurant = restaurantRecommendations[1]; // Savotta
-    } else {
-      selectedRestaurant = restaurantRecommendations[0]; // Ravintola Nokka (default)
-    }
-
-    return JSON.stringify({
-      restaurant: selectedRestaurant,
-      allRestaurants: restaurantRecommendations,
-    });
-  },
-  {
-    name: "get_restaurant_recommendations",
-    description:
-      "Get a curated restaurant recommendation for a destination. Use preference 'fine_dining'/'luxury' for upscale, 'traditional'/'local' for authentic local cuisine, or 'moderate' for balanced options.",
-    schema: z.object({
-      destination: z
-        .string()
-        .describe("The destination city to get restaurant recommendations for"),
-      preference: z
-        .enum(["fine_dining", "luxury", "traditional", "local", "moderate"])
-        .default("moderate")
-        .describe("User's dining preference"),
-    }),
-  }
-);
 
 export const buildItinerary = tool(
   ({ destination, hotelData, restaurantData, parkingData }) => {
