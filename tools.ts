@@ -6,12 +6,17 @@ export const order = tool(
     // Calculate random ETA between 5-15 minutes
     const etaMinutes = Math.floor(Math.random() * 11) + 5; // Random between 5-15
     
-    // Calculate arrival time in 24-hour format (Finnish time)
+    // Calculate arrival time in 24-hour format (Finnish time - Europe/Helsinki)
     const now = new Date();
     const arrivalDate = new Date(now.getTime() + etaMinutes * 60000);
-    const hours = arrivalDate.getHours().toString().padStart(2, '0');
-    const minutes = arrivalDate.getMinutes().toString().padStart(2, '0');
-    const arrivalTime = `${hours}:${minutes}`;
+    
+    // Format in Finnish timezone
+    const arrivalTime = arrivalDate.toLocaleTimeString('fi-FI', { 
+      timeZone: 'Europe/Helsinki',
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    });
     
     const response = await fetch(
       `${Deno.env.get("API_BASE_URL")}/${restaurant}/order`,
